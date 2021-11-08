@@ -5,7 +5,24 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <pwd.h>
+#include <errno.h>
 #define PORT 8080
+
+char *get_error() {
+    if (errno==EAGAIN) {
+        return "EAGAIN";
+    }
+    if (errno==EINVAL) {
+        return "EINVAL";
+    }
+    if (errno==EPERM) {
+        return "EPERM";
+    }
+    return "";
+}
 
 int main(int argc, char const *argv[])
 {
@@ -53,10 +70,56 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    valread = read(new_socket, buffer, 1024);
-    printf("Read %d bytes: %s\n", valread, buffer);
-    send(new_socket, hello, strlen(hello), 0);
-    printf("Hello message sent\n");
+    // Fork and setuid(nobody) on child process
+    pid_t pid = fork();
+    if (pid==0) {
+        struct passwd *passwd_nobody = getpwnam("nobody");
+        if (setuid(passwd_nobody->pw_uid) < 0) {
+            if (errno==EPERM) {
+                puts("Running as a non-privileged user - setuid() does nothing!");
+            }
+            else {
+                printf("setuid(%d) %s error: ", passwd_nobody->pw_uid, get_error());
+                puts(strerror(errno));
+                exit(errno);
+            }
+        }
+
+        // Opening /etc/shadow should fail if setuid done correctly
+        // FILE *fp = fopen("/etc/shadow", "r");
+        // if (!fp) {
+        //     printf("fopen(/etc/shadow) %s error: ", get_error());
+        //     puts(strerror(errno));
+        //     exit(errno);
+        // }
+        // while(!feof(fp)) {
+        //     char c = fgetc(fp);
+        //     printf("%c", c);
+        // }
+
+        // printf("uid=%d, geteuid=%d, getuid=%d\n", passwd_nobody->pw_uid, geteuid(), getuid());
+
+        valread = read(new_socket, buffer, 1024);
+        printf("Read %d bytes: %s\n", valread, buffer);
+        send(new_socket, hello, strlen(hello), 0);
+        printf("Hello message sent\n");
+    }
+    else if (pid==-1) {
+        printf("fork() %s error: ", get_error());
+        puts(strerror(errno));
+        exit(errno);
+    }
+    else {
+        int status;
+        // Wait for child process to exit
+        do {
+            if (waitpid(pid, &status, 0) < 0) {
+                printf("waitpid(%d,...) %s error: ", pid, get_error());
+                puts(strerror(errno));
+                exit(errno);
+            }
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
 
     return 0;
 }
