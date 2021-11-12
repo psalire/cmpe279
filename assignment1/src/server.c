@@ -72,6 +72,7 @@ int main(int argc, char const *argv[])
 
     // Fork and setuid(nobody) on child process
     pid_t pid = fork();
+    // The child process
     if (pid==0) {
         struct passwd *passwd_nobody = getpwnam("nobody");
         if (setuid(passwd_nobody->pw_uid) < 0) {
@@ -85,30 +86,20 @@ int main(int argc, char const *argv[])
             }
         }
 
-        // Opening /etc/shadow should fail if setuid done correctly
-        // FILE *fp = fopen("/etc/shadow", "r");
-        // if (!fp) {
-        //     printf("fopen(/etc/shadow) %s error: ", get_error());
-        //     puts(strerror(errno));
-        //     exit(errno);
-        // }
-        // while(!feof(fp)) {
-        //     char c = fgetc(fp);
-        //     printf("%c", c);
-        // }
-
-        // printf("uid=%d, geteuid=%d, getuid=%d\n", passwd_nobody->pw_uid, geteuid(), getuid());
-
+        // Reading user data into the buffer and using it can lead to vuln, so
+        // setuid was used prior
         valread = read(new_socket, buffer, 1024);
         printf("Read %d bytes: %s\n", valread, buffer);
         send(new_socket, hello, strlen(hello), 0);
         printf("Hello message sent\n");
     }
+    // Fork error
     else if (pid==-1) {
         printf("fork() %s error: ", get_error());
         puts(strerror(errno));
         exit(errno);
     }
+    // Parent process
     else {
         int status;
         // Wait for child process to exit
