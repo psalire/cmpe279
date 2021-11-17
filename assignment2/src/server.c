@@ -46,8 +46,8 @@ int main(int argc, char *const *argv)
     char *hello = "Hello from server";
 
     if (b_arg_buffer != NULL && s_arg != -1) {
-        // Reading user data into the buffer and using it can lead to vuln, so
-        // setuid was used prior
+        // Reading user data into the buffer and using it can lead to vuln,
+        // so fork+setuid+execv was used prior
         valread = read(s_arg, b_arg_buffer, 1024);
         printf("Read %d bytes: %s\n", valread, b_arg_buffer);
         send(s_arg, hello, strlen(hello), 0);
