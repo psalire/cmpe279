@@ -45,6 +45,7 @@ int main(int argc, char *const *argv)
     int server_fd, new_socket, valread;
     char *hello = "Hello from server";
 
+    // The fork+exec'd process will execute the code here
     if (b_arg_buffer != NULL && s_arg != -1) {
         // Reading user data into the buffer and using it can lead to vuln,
         // so fork+setuid+execv was used prior
